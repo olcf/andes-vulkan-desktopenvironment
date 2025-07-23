@@ -1,8 +1,8 @@
-# Bootstrap: docker
-# From: nvidia/cuda:11.2.2-cudnn8-devel-ubuntu20.04
+Bootstrap: docker
+From: nvidia/cuda:11.2.2-cudnn8-devel-ubuntu20.04
 
-Bootstrap: localimage
-From: cuda_11.2.2-cudnn8-devel-ubuntu20.04.sif
+#Bootstrap: localimage
+#From: cuda_11.2.2-cudnn8-devel-ubuntu20.04.sif
 
 
 %environment
