@@ -47,7 +47,7 @@ export no_proxy='localhost,127.0.0.0/8,*.ccs.ornl.gov'
 apptainer shell --nv ./myvulkan.sif
 
 # Start the entrypoint.sh script, which starts the XFCE desktop environment and the VNC server
-/home/vncuser/entrypoint.sh # or you can start it from the current dir if you have it there with ./entrypoint.sh
+/opt/entrypoint.sh # or you can start it from the current dir if you have it there with ./entrypoint.sh
 ```
 
 **Terminal 2:**
