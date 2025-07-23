@@ -1,0 +1,111 @@
+# Bootstrap: docker
+# From: nvidia/cuda:11.2.2-cudnn8-devel-ubuntu20.04
+
+Bootstrap: localimage
+From: cuda_11.2.2-cudnn8-devel-ubuntu20.04.sif
+
+
+%environment
+export DEBIAN_FRONTEND=noninteractive 
+export DISPLAY=:1 
+export LANG=C.UTF-8 
+export XDG_CONFIG_DIRS=/etc/xdg 
+export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json 
+export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d
+export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu
+export DBUS_SESSION_BUS_ADDRESS=""
+#export LANG='en_US.UTF-8'
+#export LANGUAGE='en_US:en'
+#export LC_ALL='en_US.UTF-8'
+
+%files
+./entrypoint.sh /home/vncuser/entrypoint.sh
+
+%post
+set -ex
+export DEBIAN_FRONTEND=noninteractive 
+export DISPLAY=:1 
+export LANG=C.UTF-8 
+export XDG_CONFIG_DIRS=/etc/xdg 
+export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json 
+export VK_LAYER_PATH=/usr/share/vulkan/explicit_layer.d
+export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu
+export DBUS_SESSION_BUS_ADDRESS=""
+#export LANG='en_US.UTF-8'
+#export LANGUAGE='en_US:en'
+#export LC_ALL='en_US.UTF-8'
+
+echo 'Acquire::AllowInsecureRepositories "true";' > /etc/apt/apt.conf.d/99insecure \
+  && echo 'Acquire::AllowDowngradeToInsecureRepositories "true";' >> \
+  /etc/apt/apt.conf.d/99insecure
+
+# Install desktop and Vulkan libraries
+apt-get update && apt-get install -y \
+  sudo curl wget git vim nano unzip \
+  xfce4 xfce4-goodies x11vnc dbus-x11 thunar \
+  vulkan-tools vulkan-validationlayers libvulkan1 \
+  mesa-vulkan-drivers libglfw3-dev  libgl1-mesa-glx
+apt-get install -y --install-recommends xfce4 xfce4-goodies xfce4-terminal gdm3- lightdm-
+apt-get install -y firefox xterm tilix gtkwave evince nomacs tkcvs 
+apt-get install -y tigervnc-standalone-server tigervnc-xorg-extension tigervnc-viewer vinagre xvfb
+#apt-get install -y nvidia-driver-470 
+
+# from https://github.com/NVIDIA/nvidia-container-toolkit/issues/16#issuecomment-2471325058
+#wget https://us.download.nvidia.com/XFree86/Linux-x86_64/470.256.02/NVIDIA-Linux-x86_64-470.256.02.run
+# Note (2025-07-22): bunch of hail marys to see if this works
+wget https://download.nvidia.com/XFree86/Linux-x86_64/470.182.03/NVIDIA-Linux-x86_64-470.182.03.run
+chmod +x NVIDIA-Linux-x86_64-470.182.03.run
+./NVIDIA-Linux-x86_64-470.182.03.run -x # extracts files from driver installer
+cd NVIDIA-Linux-x86_64-470.182.03/
+mkdir -p /usr/share/vulkan/explicit_layer.d /usr/share/vulkan/icd.d /usr/share/vulkan/implicit_layer.d /usr/share/glvnd/egl_vendor.d/ /usr/share/egl/egl_external_platform.d
+cp nvidia_layers.json /usr/share/vulkan/implicit_layer.d
+cp nvidia_icd.json /usr/share/vulkan/icd.d
+cp 10_nvidia.json  /usr/share/glvnd/egl_vendor.d
+cp 10_nvidia_wayland.json /usr/share/egl/egl_external_platform.d
+install -d /etc/OpenCL/vendors && echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd 
+
+rm -rf ./NVIDIA-Linux-x86_64-470.182.03.run NVIDIA-Linux-x86_64-470.182.03/
+
+
+# install cmake
+cd /opt
+wget https://github.com/Kitware/CMake/releases/download/v3.31.8/cmake-3.31.8-linux-x86_64.sh
+chmod +x ./cmake-3.31.8-linux-x86_64.sh
+./cmake-3.31.8-linux-x86_64.sh --skip-license
+
+
+#apt-get install -y nvidia-vulkan-common nvidia-vulkan-icd vulkan-utils
+# Install Vulkan utilities tools (covered in previous step pending removal save for cache)
+apt-get update && apt-get install -y \
+  vulkan-tools vulkan-validationlayers vulkan-utils \
+  libvulkan1 mesa-vulkan-drivers 
+
+apt-get update && apt-get install -y libvncserver1
+apt-get install -y libxau6 libxdmcp6 libxcb1 libxext6 libx11-6
+apt-get install -y libglvnd0 libgl1 libglx0 libegl1 libgles2 mesa-utils
+apt-get install -y ocl-icd-libopencl1 clinfo
+apt-get install -y libx11-xcb1 libxkbcommon-x11-0 libxrandr2 libegl1 libvulkan1 vulkan-tools
+
+
+cd /opt && git clone https://github.com/NVIDIA/cuda-samples
+
+#install -d /usr/share/glvnd/egl_vendor.d && printf "{\n    \"file_format_version\" : \"1.0.0\",\n    \"ICD\": {\n        \"library_path\": \"libEGL_nvidia.so.0\"\n    }\n}\n" > /usr/share/glvnd/egl_vendor.d/10_nvidia.json && \
+#install -d /etc/vulkan/icd.d && printf "{\n    \"file_format_version\" : \"1.0.0\",\n    \"ICD\": {\n        \"library_path\": \"libGLX_nvidia.so.0\",\n        \"api_version\" : \"$( realpath $( ldconfig -N -p | grep libvulkan.so.1 | awk '{ print $4 }' ) | sed -r 's|.*libvulkan\.so\.(1.[0-9]+.[0-9]+)|\1|' )\"\n    }\n}\n" > /etc/vulkan/icd.d/nvidia_icd.json
+
+
+#chmod +x NVIDIA-Linux-x86_64-470.182.03.run
+
+cd /opt/cuda-samples/Samples/5_Domain_Specific/simpleVulkan
+sed -i "11s/.*/set(CMAKE_CUDA_ARCHITECTURES 37)/" CMakeLists.txt
+mkdir build && cd build
+/opt/bin/cmake .. && make
+#RUN useradd -m vncuser && echo "vncuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+#WORKDIR /home/vncuser
+
+chmod +x /home/vncuser/entrypoint.sh
+
+#USER vncuser
+
+#EXPOSE 5901
+#ENTRYPOINT ["entrypoint.sh"]
